@@ -1,0 +1,6 @@
+{
+  "name": "Aurapad",
+  "description": "Premium offline-first note-taking application inspired by modern Material 3 design principles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
