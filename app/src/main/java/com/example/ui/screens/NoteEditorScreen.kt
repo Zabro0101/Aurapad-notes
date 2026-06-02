@@ -51,16 +51,34 @@ fun NoteEditorScreen(
     viewModel: MainViewModel,
     noteId: Int?,
     initialCategoryId: Int?,
+    autoRecord: Boolean = false,
     onNavigateBack: () -> Unit,
     onNavigateToCanvasPaint: () -> Unit
 ) {
     val context = LocalContext.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
     val categories by viewModel.categoriesFlow.collectAsState()
     val rawNote by viewModel.currentEditingNote.collectAsState()
+
+    var didTriggerAutoRecord by remember(noteId) { mutableStateOf(false) }
 
     // Initialize editing target
     LaunchedEffect(key1 = noteId) {
         viewModel.startEditingOrCreateNote(noteId, initialCategoryId)
+    }
+
+    // Handle auto record trigger once rawNote is loaded
+    if (autoRecord && rawNote != null && !didTriggerAutoRecord) {
+        val loadedNoteId = rawNote?.id
+        LaunchedEffect(loadedNoteId) {
+            didTriggerAutoRecord = true
+            if (!viewModel.isRecording.value) {
+                viewModel.startRecordingVoice()
+                Toast.makeText(context, "Voice recording started automatically", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     if (rawNote == null) {
@@ -92,6 +110,31 @@ fun NoteEditorScreen(
                 }
             }
         }
+    }
+
+    // Safe auto-save & keyboard close on system back swipe / button gesture
+    androidx.activity.compose.BackHandler(enabled = true) {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+        viewModel.updateCurrentNoteState { 
+            it.copy(
+                title = titleVal,
+                content = contentVal,
+                tags = tagVal
+            )
+        }
+        if (checklistItems.isNotEmpty()) {
+            val array = JSONArray()
+            for (item in checklistItems) {
+                array.put(JSONObject().apply {
+                    put("text", item.text)
+                    put("checked", item.checked)
+                })
+            }
+            viewModel.updateCurrentNoteState { it.copy(checklistJson = array.toString()) }
+        }
+        viewModel.saveCurrentNote()
+        onNavigateBack()
     }
 
     // Helper to serialize checklist back to JSON string
@@ -136,6 +179,8 @@ fun NoteEditorScreen(
 
     // Synchronize local caches with parent state transitions (auto-save helper)
     val syncCachesAndSave = {
+        keyboardController?.hide()
+        focusManager.clearFocus()
         viewModel.updateCurrentNoteState { 
             it.copy(
                 title = titleVal,
@@ -477,10 +522,8 @@ fun NoteEditorScreen(
                     BasicTextField(
                         value = titleVal,
                         onValueChange = { titleVal = it; syncCachesAndSave() },
-                        textStyle = TextStyle(
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                        textStyle = MaterialTheme.typography.headlineMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -490,10 +533,8 @@ fun NoteEditorScreen(
                             if (titleVal.isEmpty()) {
                                 Text(
                                     "Title",
-                                    style = TextStyle(
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Gray.copy(alpha = 0.6f)
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
                                 )
                             }
@@ -615,10 +656,8 @@ fun NoteEditorScreen(
                     BasicTextField(
                         value = contentVal,
                         onValueChange = { contentVal = it; syncCachesAndSave() },
-                        textStyle = TextStyle(
-                            fontSize = 16.sp,
-                            lineHeight = 24.sp,
-                            color = Color.Black
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -628,9 +667,8 @@ fun NoteEditorScreen(
                             if (contentVal.isEmpty()) {
                                 Text(
                                     "Note something offline...",
-                                    style = TextStyle(
-                                        fontSize = 16.sp,
-                                        color = Color.Gray.copy(alpha = 0.6f)
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
                                 )
                             }
@@ -671,9 +709,8 @@ fun NoteEditorScreen(
                                         saveChecklist()
                                         viewModel.saveCurrentNote()
                                     },
-                                    textStyle = TextStyle(
-                                        fontSize = 15.sp,
-                                        color = if (item.checked) Color.Gray else Color.Black,
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        color = if (item.checked) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
                                         textDecoration = if (item.checked) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                                     ),
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)

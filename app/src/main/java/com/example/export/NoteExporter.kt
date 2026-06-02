@@ -42,7 +42,7 @@ object NoteExporter {
 
     // 1. Export Note to TXT format
     fun exportToTxt(context: Context, note: Note, categoryName: String?): File {
-        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val dir = com.example.backup.BackupManager.getLocalExportDirectory(context)
         val sanitizedTitle = note.title.ifEmpty { "Untitled" }.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         val file = File(dir, "$sanitizedTitle.txt")
 
@@ -73,7 +73,7 @@ object NoteExporter {
 
     // 2. Export Note to HTML format
     fun exportToHtml(context: Context, note: Note, categoryName: String?): File {
-        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val dir = com.example.backup.BackupManager.getLocalExportDirectory(context)
         val sanitizedTitle = note.title.ifEmpty { "Untitled" }.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         val file = File(dir, "$sanitizedTitle.html")
 
@@ -201,7 +201,7 @@ object NoteExporter {
 
     // 3. Export Note to genuine PDF document using local Android PdfDocument API
     fun exportToPdf(context: Context, note: Note, categoryName: String?): File {
-        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val dir = com.example.backup.BackupManager.getLocalExportDirectory(context)
         val sanitizedTitle = note.title.ifEmpty { "Untitled" }.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         val file = File(dir, "$sanitizedTitle.pdf")
 

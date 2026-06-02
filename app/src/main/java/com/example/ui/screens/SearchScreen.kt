@@ -36,6 +36,16 @@ fun SearchScreen(
     val tagsList by viewModel.allTagsFlow.collectAsState()
     val activeTagFilter by viewModel.selectedTagFilter.collectAsState()
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+    // Handle system back gesture
+    androidx.activity.compose.BackHandler {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+        onNavigateBack()
+    }
+
     Scaffold(
         topBar = {
             Surface(
@@ -50,7 +60,11 @@ fun SearchScreen(
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onNavigateBack) {
+                        IconButton(onClick = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
+                            onNavigateBack()
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
 

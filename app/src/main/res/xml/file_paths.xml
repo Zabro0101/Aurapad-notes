@@ -4,4 +4,6 @@
     <cache-path name="backups" path="backups/" />
     <files-path name="audio" path="audio/" />
     <files-path name="drawings" path="drawings/" />
+    <external-files-path name="external_files" path="." />
+    <external-path name="external_docs" path="." />
 </paths>

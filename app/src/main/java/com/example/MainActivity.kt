@@ -30,6 +30,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.MainViewModel
@@ -55,6 +61,8 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme(darkTheme = isDarkTheme) {
                 val navController = rememberNavController()
                 val context = LocalContext.current
+                val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+                val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
                 // Request microphone record permissions for audio support
                 val permissionLauncher = rememberLauncherForActivityResult(
@@ -122,6 +130,8 @@ class MainActivity : ComponentActivity() {
                             Button(
                                 onClick = {
                                     if (entryPinText == masterPin) {
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
                                         isAppLocked = false
                                     } else {
                                         Toast.makeText(context, "Invalid Master PIN", Toast.LENGTH_SHORT).show()
@@ -138,9 +148,37 @@ class MainActivity : ComponentActivity() {
                     // Start navigation Graph
                     NavHost(
                         navController = navController,
-                        startDestination = "splash"
+                        startDestination = "splash",
+                        enterTransition = {
+                            slideIntoContainer(
+                                AnimatedContentTransitionScope.SlideDirection.Left,
+                                animationSpec = tween(350)
+                            ) + fadeIn(animationSpec = tween(350))
+                        },
+                        exitTransition = {
+                            slideOutOfContainer(
+                                AnimatedContentTransitionScope.SlideDirection.Left,
+                                animationSpec = tween(350)
+                            ) + fadeOut(animationSpec = tween(350))
+                        },
+                        popEnterTransition = {
+                            slideIntoContainer(
+                                AnimatedContentTransitionScope.SlideDirection.Right,
+                                animationSpec = tween(350)
+                            ) + fadeIn(animationSpec = tween(350))
+                        },
+                        popExitTransition = {
+                            slideOutOfContainer(
+                                AnimatedContentTransitionScope.SlideDirection.Right,
+                                animationSpec = tween(350)
+                            ) + fadeOut(animationSpec = tween(350))
+                        }
                     ) {
-                        composable("splash") {
+                        composable(
+                            "splash",
+                            enterTransition = { EnterTransition.None },
+                            exitTransition = { fadeOut(animationSpec = tween(350)) }
+                        ) {
                             SplashScreen(
                                 onOnboardingCheck = {
                                     if (onboardingCompleted) {
@@ -156,7 +194,11 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable("onboarding") {
+                        composable(
+                            "onboarding",
+                            enterTransition = { fadeIn(animationSpec = tween(350)) },
+                            exitTransition = { fadeOut(animationSpec = tween(350)) }
+                        ) {
                             OnboardingScreen(
                                 onFinish = {
                                     viewModel.completeOnboarding()
@@ -170,9 +212,12 @@ class MainActivity : ComponentActivity() {
                         composable("home") {
                             HomeScreen(
                                 viewModel = viewModel,
-                                onNavigateToEditor = { noteId, catId ->
+                                onNavigateToEditor = { noteId, catId, autoRecord ->
                                     val safeId = noteId ?: 0
-                                    val queryPart = if (catId != null) "?catId=$catId" else ""
+                                    var queryPart = if (catId != null) "?catId=$catId" else ""
+                                    if (autoRecord) {
+                                        queryPart += if (queryPart.isEmpty()) "?autoRecord=true" else "&autoRecord=true"
+                                    }
                                     navController.navigate("editor/$safeId$queryPart")
                                 },
                                 onNavigateToArchive = { navController.navigate("archive") },
@@ -188,23 +233,29 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(
-                            route = "editor/{noteId}?catId={catId}",
+                            route = "editor/{noteId}?catId={catId}&autoRecord={autoRecord}",
                             arguments = listOf(
                                 navArgument("noteId") { type = NavType.IntType },
                                 navArgument("catId") { 
                                     type = NavType.IntType
                                     defaultValue = 0 
+                                },
+                                navArgument("autoRecord") {
+                                    type = NavType.BoolType
+                                    defaultValue = false
                                 }
                             )
                         ) { backStackEntry ->
                             val noteId = backStackEntry.arguments?.getInt("noteId") ?: 0
                             val catIdArg = backStackEntry.arguments?.getInt("catId") ?: 0
                             val catId = if (catIdArg == 0) null else catIdArg
+                            val autoRecord = backStackEntry.arguments?.getBoolean("autoRecord") ?: false
 
                             NoteEditorScreen(
                                 viewModel = viewModel,
                                 noteId = noteId,
                                 initialCategoryId = catId,
+                                autoRecord = autoRecord,
                                 onNavigateBack = { navController.popBackStack() },
                                 onNavigateToCanvasPaint = { navController.navigate("drawing") }
                             )

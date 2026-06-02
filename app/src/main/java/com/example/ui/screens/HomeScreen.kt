@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -43,7 +45,7 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     viewModel: MainViewModel,
-    onNavigateToEditor: (Int?, Int?) -> Unit,
+    onNavigateToEditor: (Int?, Int?, Boolean) -> Unit,
     onNavigateToArchive: () -> Unit,
     onNavigateToFavorites: () -> Unit,
     onNavigateToDrawing: () -> Unit,
@@ -68,6 +70,7 @@ fun HomeScreen(
 
     // Quick Note Action Options Dialog/Sheet
     var activeLongClickedNote by remember { mutableStateOf<Note?>(null) }
+    var isFabExpanded by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -371,14 +374,101 @@ fun HomeScreen(
                 }
             },
             floatingActionButton = {
-                // Expanding FAB action list or direct Add
-                FloatingActionButton(
-                    onClick = { onNavigateToEditor(null, selectedFilterCatId) },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.testTag("add_note_fab")
+                Column(
+                    horizontalAlignment = Alignment.End, 
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Note")
+                    AnimatedVisibility(
+                        visible = isFabExpanded,
+                        enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(250)) { it / 2 },
+                        exit = fadeOut(animationSpec = tween(150)) + slideOutVertically(animationSpec = tween(180)) { it / 2 }
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Sub-action: Take Text Note
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Text(
+                                        text = "Text Note",
+                                        color = MaterialTheme.colorScheme.surface,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onNavigateToEditor(null, selectedFilterCatId, false)
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.EditNote,
+                                        contentDescription = "New Text Note"
+                                    )
+                                }
+                            }
+
+                            // Sub-action: Audio Record
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Text(
+                                        text = "Voice Record",
+                                        color = MaterialTheme.colorScheme.surface,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onNavigateToEditor(null, selectedFilterCatId, true)
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Mic,
+                                        contentDescription = "New Voice Record"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Main FAB
+                    FloatingActionButton(
+                        onClick = { isFabExpanded = !isFabExpanded },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.testTag("add_note_fab")
+                    ) {
+                        Icon(
+                            imageVector = if (isFabExpanded) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = if (isFabExpanded) "Close Menu" else "Add Note"
+                        )
+                    }
                 }
             }
         ) { innerPadding ->
@@ -388,6 +478,20 @@ fun HomeScreen(
                     .background(MaterialTheme.colorScheme.background)
                     .padding(innerPadding)
             ) {
+                // Dimmed backdrop overlay when FAB is expanded, mimicking Samsung Notes overlay style
+                AnimatedVisibility(
+                    visible = isFabExpanded,
+                    enter = fadeIn(animationSpec = tween(200)),
+                    exit = fadeOut(animationSpec = tween(150))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .clickable { isFabExpanded = false }
+                    )
+                }
+
                 if (notes.isEmpty()) {
                     Column(
                         modifier = Modifier
@@ -418,48 +522,54 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    if (isGridView) {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            contentPadding = PaddingValues(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            items(notes, key = { it.id }) { note ->
-                                NoteCard(
-                                    note = note,
-                                    categories = categories,
-                                    onClick = { 
-                                        if (note.isLocked) {
-                                            activeLongClickedNote = note
-                                        } else {
-                                            onNavigateToEditor(note.id, null)
-                                        }
-                                    },
-                                    onLongClick = { activeLongClickedNote = note }
-                                )
+                    Crossfade(
+                        targetState = isGridView,
+                        animationSpec = tween(350),
+                        label = "GridListSwitch"
+                    ) { gridMode ->
+                        if (gridMode) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                contentPadding = PaddingValues(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(notes, key = { it.id }) { note ->
+                                    NoteCard(
+                                        note = note,
+                                        categories = categories,
+                                        onClick = { 
+                                            if (note.isLocked) {
+                                                activeLongClickedNote = note
+                                            } else {
+                                                onNavigateToEditor(note.id, null, false)
+                                            }
+                                        },
+                                        onLongClick = { activeLongClickedNote = note }
+                                    )
+                                }
                             }
-                        }
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(1),
-                            contentPadding = PaddingValues(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            items(notes, key = { it.id }) { note ->
-                                NoteCard(
-                                    note = note,
-                                    categories = categories,
-                                    onClick = { 
-                                        if (note.isLocked) {
-                                            activeLongClickedNote = note
-                                        } else {
-                                            onNavigateToEditor(note.id, null)
-                                        }
-                                    },
-                                    onLongClick = { activeLongClickedNote = note }
-                                )
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(1),
+                                contentPadding = PaddingValues(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(notes, key = { it.id }) { note ->
+                                    NoteCard(
+                                        note = note,
+                                        categories = categories,
+                                        onClick = { 
+                                            if (note.isLocked) {
+                                                activeLongClickedNote = note
+                                            } else {
+                                                onNavigateToEditor(note.id, null, false)
+                                            }
+                                        },
+                                        onLongClick = { activeLongClickedNote = note }
+                                    )
+                                }
                             }
                         }
                     }
@@ -490,10 +600,10 @@ fun HomeScreen(
                     onClick = {
                         activeLongClickedNote = null
                         if (!note.isLocked) {
-                            onNavigateToEditor(note.id, null)
+                            onNavigateToEditor(note.id, null, false)
                         } else {
                             // Manual editor entry
-                            onNavigateToEditor(note.id, null)
+                            onNavigateToEditor(note.id, null, false)
                         }
                     }
                 ) {
@@ -549,9 +659,34 @@ fun NoteCard(
         else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
     }
 
+    val scale = remember { androidx.compose.animation.core.Animatable(0.92f) }
+    val alphaAnim = remember { androidx.compose.animation.core.Animatable(0.3f) }
+    LaunchedEffect(note.id) {
+        launch {
+            scale.animateTo(
+                1f,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                )
+            )
+        }
+        launch {
+            alphaAnim.animateTo(
+                1f,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 250)
+            )
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+                this.alpha = alphaAnim.value
+            }
             .clip(RoundedCornerShape(24.dp))
             .border(
                 1.5.dp,

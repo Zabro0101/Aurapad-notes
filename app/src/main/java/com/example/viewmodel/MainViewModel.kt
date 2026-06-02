@@ -420,7 +420,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun triggerLocalBackup(onDone: (File?) -> Unit) {
         viewModelScope.launch {
             try {
-                val backupFile = BackupManager.exportZipBackup(context)
+                val backupFile = BackupManager.exportLocalXmlBackup(context)
                 onDone(backupFile)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -429,10 +429,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun triggerLocalRestore(zipFile: File, onDone: (Boolean) -> Unit) {
+    fun triggerLocalRestore(xmlFile: File, onDone: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                val result = BackupManager.restoreZipBackup(context, zipFile)
+                val result = BackupManager.restoreLocalXmlBackup(context, xmlFile)
                 onDone(result)
             } catch (e: Exception) {
                 e.printStackTrace()
